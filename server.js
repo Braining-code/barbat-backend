@@ -2,15 +2,17 @@ import express from "express";
 import cors from "cors";
 
 const app = express();
+
+// configuración base
 app.use(cors());
 app.use(express.json());
 
-// HOME
+// ruta principal
 app.get("/", (req, res) => {
   res.json({ message: "Barbat backend online" });
 });
 
-// MOCK DE BUSQUEDA EXISTENTE
+// ruta de prueba existente
 app.get("/buscar", (req, res) => {
   res.json({
     status: "ok",
@@ -19,19 +21,33 @@ app.get("/buscar", (req, res) => {
   });
 });
 
-// NUEVO ENDPOINT REAL PARA EL MVP
+// NUEVA RUTA NECESARIA PARA EL MVP
 app.post("/api/search", (req, res) => {
   const { brand, classes } = req.body;
 
+  // validación básica
+  if (!brand || !classes) {
+    return res.status(400).json({
+      ok: false,
+      message: "Faltan parámetros: brand y classes son obligatorios"
+    });
+  }
+
+  // respuesta temporal del MVP
   res.json({
     ok: true,
-    brand,
-    classes,
     message: "Ruta /api/search funcionando correctamente",
-    note: "Esto todavía es mock; la matemática se agregará luego"
+    brand: brand,
+    classes: classes,
+    analysis: {
+      ready: true,
+      provider: "mock", // luego será TMview/WIPO/INPI
+      nextStep: "Conectar providers reales"
+    }
   });
 });
 
+// puerto dinámico para Render
 const port = process.env.PORT || 3000;
 app.listen(port, () => {
   console.log("Backend Barbat corriendo en puerto " + port);
