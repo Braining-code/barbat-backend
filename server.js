@@ -1,5 +1,6 @@
 import express from "express";
 import cors from "cors";
+import fetch from "node-fetch";
 
 const app = express();
 
@@ -21,30 +22,57 @@ app.get("/buscar", (req, res) => {
   });
 });
 
-// NUEVA RUTA NECESARIA PARA EL MVP
-app.post("/api/search", (req, res) => {
-  const { brand, classes } = req.body;
+// 🔥 RUTA REAL MVP: BUSQUEDA EN TMVIEW (ARGENTINA)
+app.get("/api/search", async (req, res) => {
+  const term = req.query.term;
 
-  // validación básica
-  if (!brand || !classes) {
-    return res.status(400).json({
-      ok: false,
-      message: "Faltan parámetros: brand y classes son obligatorios"
-    });
+  if (!term) {
+    return res.status(400).json({ error: "Missing search term ?term=" });
   }
 
-  // respuesta temporal del MVP
-  res.json({
-    ok: true,
-    message: "Ruta /api/search funcionando correctamente",
-    brand: brand,
-    classes: classes,
-    analysis: {
-      ready: true,
-      provider: "mock", // luego será TMview/WIPO/INPI
-      nextStep: "Conectar providers reales"
+  try {
+    // URL de TMView con AR y WO para más resultados
+    const url = `https://www.tmdn.org/tmview/api/basicSearch?text=${encodeURIComponent(
+      term
+    )}&offices=AR&territories=AR`;
+
+    // Headers que permiten que TMView acepte la request
+    const headers = {
+      "User-Agent":
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36",
+      Accept: "application/json",
+      Referer: "https://www.tmdn.org/tmview/",
+      Origin: "https://www.tmdn.org"
+    };
+
+    const response = await fetch(url, { headers });
+
+    if (!response.ok) {
+      return res.status(response.status).json({
+        ok: false,
+        error: "TMView rejected the request",
+        status: response.status
+      });
     }
-  });
+
+    const data = await response.json();
+
+    return res.json({
+      ok: true,
+      provider: "tmview",
+      query: term,
+      count: data?.results?.length || 0,
+      results: data?.results || []
+    });
+
+  } catch (error) {
+    console.error("Error TMView:", error);
+    return res.status(500).json({
+      ok: false,
+      error: "Internal server error",
+      details: error.message
+    });
+  }
 });
 
 // puerto dinámico para Render
@@ -52,3 +80,4 @@ const port = process.env.PORT || 3000;
 app.listen(port, () => {
   console.log("Backend Barbat corriendo en puerto " + port);
 });
+
