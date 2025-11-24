@@ -1,8 +1,8 @@
 import express from "express";
 import cors from "cors";
 
-// 👉 Importamos el servicio real de TMView
-import { getTmviewResults } from "./services/tmview.js";
+// 👉 Importamos el scraper real con Puppeteer
+import { scrapeTmview } from "./services/tmview.js";
 
 const app = express();
 
@@ -14,7 +14,7 @@ app.get("/", (req, res) => {
   res.json({ message: "Barbat backend online" });
 });
 
-// 🔵 Ruta mock previa (puede quedar)
+// 🔵 Ruta mock (puede quedar)
 app.get("/buscar", (req, res) => {
   res.json({
     status: "ok",
@@ -23,7 +23,7 @@ app.get("/buscar", (req, res) => {
   });
 });
 
-// 🔥 RUTA REAL DEL MVP (DIVI → BACKEND → TMVIEW)
+// 🔥 RUTA REAL DEL MVP
 app.post("/api/search", async (req, res) => {
   const { brand, classes } = req.body;
 
@@ -35,34 +35,33 @@ app.post("/api/search", async (req, res) => {
   }
 
   try {
-    // 👉 Consultamos TMView con la marca ingresada
-    const tmviewResults = await getTmviewResults(brand);
+    // 👉 Scrapear TMView con Puppeteer
+    const results = await scrapeTmview(brand);
 
-    // 👉 Respondemos al frontend
-    res.json({
+    return res.json({
       ok: true,
       brand,
       classes,
       sources: {
-        tmview: tmviewResults
+        tmview: results
       },
       meta: {
-        provider: "TMView",
-        count: tmviewResults.length,
-        nextStep: "Agregar similitud y WIPO"
+        provider: "TMView (scraper)",
+        count: results.length,
+        nextStep: "Agregar similitud / WIPO"
       }
     });
 
   } catch (error) {
-    res.status(500).json({
+    return res.status(500).json({
       ok: false,
-      message: "Error interno al consultar TMView",
+      message: "Error interno al scrapear TMView",
       details: error.message
     });
   }
 });
 
-// 🔵 Puerto dinámico (OBLIGATORIO para Render)
+// 🔵 Puerto dinámico (OBLIGATORIO en Render)
 const port = process.env.PORT || 3000;
 
 app.listen(port, () => {
