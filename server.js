@@ -53,29 +53,54 @@ app.get("/api/search", async (req, res) => {
         error: "TMView rejected the request",
         status: response.status
       });
-    }
+    }import express from "express";
+import cors from "cors";
 
-    const data = await response.json();
+const app = express();
 
-    return res.json({
-      ok: true,
-      provider: "tmview",
-      query: term,
-      count: data?.results?.length || 0,
-      results: data?.results || []
-    });
+// Configuración global
+app.use(cors());
+app.use(express.json());
 
-  } catch (error) {
-    console.error("Error TMView:", error);
-    return res.status(500).json({
-      ok: false,
-      error: "Internal server error",
-      details: error.message
-    });
-  }
+// Ruta base
+app.get("/", (req, res) => {
+  res.json({ message: "Barbat backend online" });
 });
 
-// puerto dinámico para Render
+// Ruta mock previa
+app.get("/buscar", (req, res) => {
+  res.json({
+    status: "ok",
+    marca: req.query.marca || null,
+    mensaje: "Esto es solo un mock para probar Render"
+  });
+});
+
+// 🔥 Ruta importante para el MVP
+app.post("/api/search", (req, res) => {
+  const { brand, classes } = req.body;
+
+  if (!brand || !classes) {
+    return res.status(400).json({
+      ok: false,
+      message: "Faltan parámetros: brand y classes son obligatorios"
+    });
+  }
+
+  res.json({
+    ok: true,
+    message: "Ruta /api/search funcionando correctamente",
+    brand,
+    classes,
+    analysis: {
+      ready: true,
+      provider: "mock",
+      nextStep: "Conectar providers reales (TMview / INPI)",
+    },
+  });
+});
+
+// Puerto dinámico para Render
 const port = process.env.PORT || 3000;
 app.listen(port, () => {
   console.log("Backend Barbat corriendo en puerto " + port);
