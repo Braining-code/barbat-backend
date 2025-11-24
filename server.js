@@ -1,6 +1,9 @@
 import express from "express";
 import cors from "cors";
 
+// 👉 Importamos el servicio real de TMView
+import { getTmviewResults } from "./services/tmview.js";
+
 const app = express();
 
 app.use(cors());
@@ -20,31 +23,43 @@ app.get("/buscar", (req, res) => {
   });
 });
 
-// 🔥 RUTA REAL DEL MVP (DIVI → BACKEND)
-app.post("/api/search", (req, res) => {
+// 🔥 RUTA REAL DEL MVP (DIVI → BACKEND → TMVIEW)
+app.post("/api/search", async (req, res) => {
   const { brand, classes } = req.body;
 
-  if (!brand || !classes) {
+  if (!brand) {
     return res.status(400).json({
       ok: false,
-      message: "Faltan parámetros: brand y classes son obligatorios"
+      message: "Falta brand"
     });
   }
 
-  // Respuesta mínima para validar conexión del MVP
-  res.json({
-    ok: true,
-    message: "Ruta /api/search funcionando correctamente",
-    brand,
-    classes,
-    analysis: {
-      similarity_score: 0,
-      phonetic_score: 0,
-      risk: "BAJO",
-      provider: "mock",
-      nextStep: "Conectar TMView real"
-    }
-  });
+  try {
+    // 👉 Consultamos TMView con la marca ingresada
+    const tmviewResults = await getTmviewResults(brand);
+
+    // 👉 Respondemos al frontend
+    res.json({
+      ok: true,
+      brand,
+      classes,
+      sources: {
+        tmview: tmviewResults
+      },
+      meta: {
+        provider: "TMView",
+        count: tmviewResults.length,
+        nextStep: "Agregar similitud y WIPO"
+      }
+    });
+
+  } catch (error) {
+    res.status(500).json({
+      ok: false,
+      message: "Error interno al consultar TMView",
+      details: error.message
+    });
+  }
 });
 
 // 🔵 Puerto dinámico (OBLIGATORIO para Render)
