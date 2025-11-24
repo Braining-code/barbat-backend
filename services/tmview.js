@@ -1,48 +1,49 @@
-import fetch from "node-fetch";
+import puppeteer from "puppeteer";
 
-export async function getTmviewResults(brand) {
+export async function scrapeTmview(brand) {
+  const browser = await puppeteer.launch({
+    headless: "new",
+    args: ["--no-sandbox", "--disable-setuid-sandbox"]
+  });
 
-  const url =
-    "https://www.tmdn.org/tmview/api/search/trademark?" +
-    new URLSearchParams({
-      criteria: "C",
-      basicSearch: brand,
-      offices: "AR,WO",
-      territories: "AR",
-      page: 1,
-      pageSize: 50
+  const page = await browser.newPage();
+
+  const url = "https://www.tmdn.org/tmview/#/tmview";
+
+  try {
+    await page.goto(url, { waitUntil: "networkidle0" });
+
+    // Escribir la marca en el buscador
+    await page.type("input[placeholder='Nombre de la marca']", brand);
+    await page.waitForTimeout(1200);
+
+    // Click en BUSCAR
+    await page.click("button[type='submit']");
+    await page.waitForNavigation({ waitUntil: "networkidle0" });
+
+    // Esperar resultados
+    await page.waitForSelector(".tm-card-content", { timeout: 8000 });
+
+    const results = await page.evaluate(() => {
+      const items = [];
+      document.querySelectorAll(".tm-card-content").forEach((card) => {
+        const name = card.querySelector(".tm-title")?.innerText || null;
+        const classes = card
+          .querySelector(".nice-classes")
+          ?.innerText.replace("Clases: ", "")
+          .split(",")
+          .map((n) => Number(n.trim())) || [];
+
+        items.push({ name, classes });
+      });
+      return items;
     });
 
-  const headers = {
-    "User-Agent":
-      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36",
-    Accept: "application/json, text/plain, */*",
-    Referer: "https://www.tmdn.org/tmview/",
-    Origin: "https://www.tmdn.org"
-  };
+    await browser.close();
+    return results;
 
-  const response = await fetch(url, { headers });
-
-  // Si TMView no responde OK → error
-  if (!response.ok) {
-    return {
-      ok: false,
-      error: "TMView request failed",
-      status: response.status
-    };
+  } catch (err) {
+    await browser.close();
+    return { ok: false, error: err.message };
   }
-
-  const data = await response.json();
-
-  const items = data?.items || [];
-
-  return items.map((item) => ({
-    name: item.name || null,
-    classes: item.niceClasses || [],
-    number: item.applicationNumber || null,
-    applicant: item.applicant || null,
-    representative: item.representative || null,
-    status: item.status || null,
-    office: item.office || null
-  }));
 }
