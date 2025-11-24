@@ -1,42 +1,45 @@
 import fetch from "node-fetch";
 
 export async function getTmviewResults(brand) {
+
   const url =
-    "https://www.tmdn.org/tmview/api/search?" +
+    "https://www.tmdn.org/tmview/api/search/trademark?" +
     new URLSearchParams({
-      query: brand,
-      rows: 50,
-      start: 0,
+      criteria: "C",
+      basicSearch: brand,
       offices: "AR,WO",
-      territories: "AR"
+      territories: "AR",
+      page: 1,
+      pageSize: 50
     });
 
   const headers = {
     "User-Agent":
       "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36",
-    Accept: "application/json",
+    Accept: "application/json, text/plain, */*",
     Referer: "https://www.tmdn.org/tmview/",
     Origin: "https://www.tmdn.org"
   };
 
-  const res = await fetch(url, { headers });
+  const response = await fetch(url, { headers });
 
-  if (!res.ok) {
+  // Si TMView no responde OK → error
+  if (!response.ok) {
     return {
       ok: false,
       error: "TMView request failed",
-      status: res.status
+      status: response.status
     };
   }
 
-  const data = await res.json();
+  const data = await response.json();
 
-  const items = data?.response?.docs || [];
+  const items = data?.items || [];
 
   return items.map((item) => ({
-    name: item.trademark || null,
-    classes: item.nice ? item.nice.map(Number) : [],
-    number: item.id || null,
+    name: item.name || null,
+    classes: item.niceClasses || [],
+    number: item.applicationNumber || null,
     applicant: item.applicant || null,
     representative: item.representative || null,
     status: item.status || null,
