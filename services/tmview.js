@@ -1,68 +1,66 @@
-import puppeteer from "puppeteer";
+import chromium from "chrome-aws-lambda";
+import puppeteer from "puppeteer-core";
 
-export async function scrapeTmview(brand) {
+export async function getTmviewResults(brand) {
   let browser = null;
 
   try {
-    // Lanzamos un navegador real en Render
+    // Lanzar Chromium según entorno (Render / local)
+    const executablePath = await chromium.executablePath;
+
     browser = await puppeteer.launch({
-      headless: "new",
-      args: [
-        "--no-sandbox",
-        "--disable-setuid-sandbox",
-        "--disable-dev-shm-usage",
-        "--disable-gpu"
-      ]
+      executablePath,
+      headless: true,
+      args: chromium.args,
+      defaultViewport: chromium.defaultViewport
     });
 
     const page = await browser.newPage();
 
-    // URL base de TMView
-    const encoded = encodeURIComponent(brand);
-    const url = `https://www.tmdn.org/tmview/#/tmview/results?page=1&pageSize=30&criteria=C&offices=AR,WO&territories=AR&basicSearch=${encoded}`;
+    const url = "https://www.tmdn.org/tmview/#/tmview";
 
-    // Navegar a la página con la marca buscada
-    await page.goto(url, {
-      waitUntil: "networkidle2",
-      timeout: 60000
-    });
+    await page.goto(url, { waitUntil: "networkidle0", timeout: 60000 });
 
-    // Esperar que TMView cargue resultados
-    await page.waitForSelector(".tm-table-row", { timeout: 20000 });
+    // Escribir marca
+    await page.type("input[placeholder='Nombre de la marca']", brand);
+    await page.waitForTimeout(1500);
 
-    // Extraer datos desde el frontend de TMView
-    const results = await page.evaluate(() => {
-      const rows = document.querySelectorAll(".tm-table-row");
+    // Click en BUSCAR
+    await page.click("button[type='submit']");
+    await page.waitForNavigation({ waitUntil: "networkidle0" });
 
-      return Array.from(rows).map((row) => {
+    // Esperar resultados
+    await page.waitForSelector(".tm-card-content", { timeout: 15000 });
+
+    const items = await page.evaluate(() => {
+      const results = [];
+
+      document.querySelectorAll(".tm-card-content").forEach((card) => {
         const name =
-          row.querySelector(".tm-trademark-name")?.innerText?.trim() || null;
+          card.querySelector(".tm-title")?.innerText?.trim() || null;
 
-        const classes = row
-          .querySelector(".tm-nice-code")
-          ?.innerText?.replace("Clases: ", "")
-          .split(",")
-          .map((c) => Number(c.trim())) || [];
+        const classes =
+          card
+            .querySelector(".nice-classes")
+            ?.innerText.replace("Clases: ", "")
+            ?.split(",")
+            .map((n) => Number(n.trim())) || [];
 
-        const status =
-          row.querySelector(".tm-status")?.innerText?.trim() || null;
-
-        const applicant =
-          row.querySelector(".tm-applicant-name")?.innerText?.trim() || null;
-
-        return { name, classes, status, applicant };
+        results.push({ name, classes });
       });
+
+      return results;
     });
 
     await browser.close();
-    return results;
 
+    return items;
   } catch (err) {
     if (browser) await browser.close();
 
     return {
       ok: false,
-      error: err.message
+      error: err.message || "Unknown error"
     };
   }
 }
