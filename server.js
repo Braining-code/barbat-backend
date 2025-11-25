@@ -1,7 +1,6 @@
 import express from "express";
 import cors from "cors";
-
-// 👉 Importamos el scraper real con Puppeteer
+import puppeteer from "puppeteer";  // ⬅️ necesario para /puppeteer-test
 import { scrapeTmview } from "./services/tmview.js";
 
 const app = express();
@@ -23,7 +22,7 @@ app.get("/buscar", (req, res) => {
   });
 });
 
-// 🔥 RUTA REAL DEL MVP
+// 🔥 RUTA REAL DEL MVP (scraping TMView)
 app.post("/api/search", async (req, res) => {
   const { brand, classes } = req.body;
 
@@ -47,7 +46,7 @@ app.post("/api/search", async (req, res) => {
       },
       meta: {
         provider: "TMView (scraper)",
-        count: results.length,
+        count: Array.isArray(results) ? results.length : 0,
         nextStep: "Agregar similitud / WIPO"
       }
     });
@@ -57,6 +56,41 @@ app.post("/api/search", async (req, res) => {
       ok: false,
       message: "Error interno al scrapear TMView",
       details: error.message
+    });
+  }
+});
+
+// ⭐ RUTA PARA PROBAR CHROME + PUPPETEER
+app.get("/puppeteer-test", async (req, res) => {
+  try {
+    const browser = await puppeteer.launch({
+      headless: "new",
+      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH,
+      args: [
+        "--no-sandbox",
+        "--disable-setuid-sandbox",
+        "--disable-dev-shm-usage",
+        "--disable-gpu"
+      ]
+    });
+
+    const page = await browser.newPage();
+    await page.goto("https://example.com", { waitUntil: "networkidle0" });
+
+    const title = await page.title();
+
+    await browser.close();
+
+    res.json({
+      ok: true,
+      message: "Chrome se ejecutó correctamente con Puppeteer.",
+      title
+    });
+
+  } catch (error) {
+    res.json({
+      ok: false,
+      error: error.message
     });
   }
 });
