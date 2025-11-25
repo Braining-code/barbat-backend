@@ -3,6 +3,7 @@ import puppeteer from "puppeteer";
 export async function getTmviewResults(brand) {
   const browser = await puppeteer.launch({
     headless: "new",
+    executablePath: process.env.PUPPETEER_EXECUTABLE_PATH,   // ⬅️ ESTA ES LA LÍNEA CLAVE
     args: [
       "--no-sandbox",
       "--disable-setuid-sandbox",
@@ -36,9 +37,8 @@ export async function getTmviewResults(brand) {
         const name = card.querySelector(".tm-title")?.innerText || null;
 
         const classesText =
-          card
-            .querySelector(".nice-classes")
-            ?.innerText.replace("Clases: ", "") || "";
+          card.querySelector(".nice-classes")?.innerText.replace("Clases: ", "") ||
+          "";
 
         const classes = classesText
           .split(",")
