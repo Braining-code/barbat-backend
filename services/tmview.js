@@ -7,24 +7,8 @@ export async function scrapeTmview(brand) {
       "--no-sandbox",
       "--disable-setuid-sandbox",
       "--disable-dev-shm-usage",
-      "--disable-gpu"
-    ]
-  });
-
-  const page = await browser.newPage();
-
-  const url = "https://www.tmdn.org/tmview/#/tmview";
-
-  try {import puppeteer from "puppeteer";
-
-export async function scrapeTmview(brand) {
-  const browser = await puppeteer.launch({
-    headless: "new",
-    args: [
-      "--no-sandbox",
-      "--disable-setuid-sandbox",
-      "--disable-dev-shm-usage",
-      "--disable-gpu"
+      "--disable-gpu",
+      "--disable-software-rasterizer",
     ]
   });
 
@@ -41,25 +25,22 @@ export async function scrapeTmview(brand) {
     await page.click('button[type="submit"]');
     await page.waitForNavigation({ waitUntil: "networkidle0" });
 
-    await page.waitForSelector(".tm-card-content", { timeout: 10000 });
+    await page.waitForSelector(".tm-card-content", { timeout: 8000 });
 
     const items = await page.evaluate(() => {
-      const data = [];
-      document.querySelectorAll(".tm-card-content").forEach(card => {
+      const results = [];
+      document.querySelectorAll(".tm-card-content").forEach((card) => {
         const name = card.querySelector(".tm-title")?.innerText || null;
-
         const classesText =
           card.querySelector(".nice-classes")?.innerText.replace("Clases: ", "") || "";
-
         const classes = classesText
           .split(",")
-          .map(x => Number(x.trim()))
+          .map((c) => Number(c.trim()))
           .filter(Boolean);
 
-        data.push({ name, classes });
+        results.push({ name, classes });
       });
-
-      return data;
+      return results;
     });
 
     await browser.close();
