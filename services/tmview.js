@@ -3,12 +3,11 @@ import puppeteer from "puppeteer";
 export async function scrapeTmview(brand) {
   const browser = await puppeteer.launch({
     headless: "new",
-    executablePath: process.env.PUPPETEER_EXECUTABLE_PATH,
     args: [
       "--no-sandbox",
       "--disable-setuid-sandbox",
-      "--disable-gpu",
-      "--disable-dev-shm-usage"
+      "--disable-dev-shm-usage",
+      "--disable-gpu"
     ]
   });
 
@@ -25,26 +24,25 @@ export async function scrapeTmview(brand) {
     await page.click('button[type="submit"]');
     await page.waitForNavigation({ waitUntil: "networkidle0" });
 
-    await page.waitForSelector(".tm-card-content", { timeout: 8000 });
+    await page.waitForSelector(".tm-card-content", { timeout: 10000 });
 
     const items = await page.evaluate(() => {
-      const results = [];
-      document.querySelectorAll(".tm-card-content").forEach((card) => {
+      const data = [];
+      document.querySelectorAll(".tm-card-content").forEach(card => {
         const name = card.querySelector(".tm-title")?.innerText || null;
 
         const classesText =
-          card.querySelector(".nice-classes")?.innerText.replace("Clases: ", "") ||
-          "";
+          card.querySelector(".nice-classes")?.innerText.replace("Clases: ", "") || "";
 
         const classes = classesText
           .split(",")
-          .map((c) => Number(c.trim()))
+          .map(x => Number(x.trim()))
           .filter(Boolean);
 
-        results.push({ name, classes });
+        data.push({ name, classes });
       });
 
-      return results;
+      return data;
     });
 
     await browser.close();
