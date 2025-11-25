@@ -15,6 +15,23 @@ export async function scrapeTmview(brand) {
 
   const url = "https://www.tmdn.org/tmview/#/tmview";
 
+  try {import puppeteer from "puppeteer";
+
+export async function scrapeTmview(brand) {
+  const browser = await puppeteer.launch({
+    headless: "new",
+    args: [
+      "--no-sandbox",
+      "--disable-setuid-sandbox",
+      "--disable-dev-shm-usage",
+      "--disable-gpu"
+    ]
+  });
+
+  const page = await browser.newPage();
+
+  const url = "https://www.tmdn.org/tmview/#/tmview";
+
   try {
     await page.goto(url, { waitUntil: "networkidle0" });
 
