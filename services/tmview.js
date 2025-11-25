@@ -1,41 +1,35 @@
-import chromium from "chrome-aws-lambda";
-import puppeteer from "puppeteer-core";
+import puppeteer from "puppeteer";
 
 export async function getTmviewResults(brand) {
-  let browser = null;
-
   try {
-    // Lanzar Chromium según entorno (Render / local)
-    const executablePath = await chromium.executablePath;
-
-    browser = await puppeteer.launch({
-      executablePath,
-      headless: true,
-      args: chromium.args,
-      defaultViewport: chromium.defaultViewport
+    const browser = await puppeteer.launch({
+      headless: "new",
+      args: ["--no-sandbox", "--disable-setuid-sandbox"]
     });
 
     const page = await browser.newPage();
 
+    // URL principal
     const url = "https://www.tmdn.org/tmview/#/tmview";
 
-    await page.goto(url, { waitUntil: "networkidle0", timeout: 60000 });
+    // Ir a TMView
+    await page.goto(url, { waitUntil: "networkidle2" });
 
-    // Escribir marca
-    await page.type("input[placeholder='Nombre de la marca']", brand);
+    // Buscar input por placeholder
+    await page.type('input[placeholder="Nombre de marca"]', brand);
     await page.waitForTimeout(1500);
 
-    // Click en BUSCAR
-    await page.click("button[type='submit']");
-    await page.waitForNavigation({ waitUntil: "networkidle0" });
+    // Click en Buscar
+    await page.click('button[type="submit"]');
+    await page.waitForNavigation({ waitUntil: "networkidle2" });
 
     // Esperar resultados
-    await page.waitForSelector(".tm-card-content", { timeout: 15000 });
+    await page.waitForSelector(".tm-card-content", { timeout: 8000 });
 
-    const items = await page.evaluate(() => {
-      const results = [];
-
-      document.querySelectorAll(".tm-card-content").forEach((card) => {
+    // Extraer contenido
+    const results = await page.evaluate(() => {
+      const items = [];
+      document.querySelectorAll(".tm-card-content").forEach(card => {
         const name =
           card.querySelector(".tm-title")?.innerText?.trim() || null;
 
@@ -44,23 +38,16 @@ export async function getTmviewResults(brand) {
             .querySelector(".nice-classes")
             ?.innerText.replace("Clases: ", "")
             ?.split(",")
-            .map((n) => Number(n.trim())) || [];
+            ?.map(n => Number(n.trim())) || [];
 
-        results.push({ name, classes });
+        items.push({ name, classes });
       });
-
-      return results;
+      return items;
     });
 
     await browser.close();
-
-    return items;
+    return results;
   } catch (err) {
-    if (browser) await browser.close();
-
-    return {
-      ok: false,
-      error: err.message || "Unknown error"
-    };
+    return { ok: false, error: err.message };
   }
 }
