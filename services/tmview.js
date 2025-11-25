@@ -1,49 +1,57 @@
-import chromium from "chrome-aws-lambda";
-import puppeteer from "puppeteer-core";
+import puppeteer from "puppeteer";
 
 export async function scrapeTmview(brand) {
   let browser = null;
 
   try {
-    const executablePath = await chromium.executablePath;
-
+    // Lanzamos un navegador real en Render
     browser = await puppeteer.launch({
-      executablePath,
-      args: chromium.args,
-      headless: chromium.headless,
-      defaultViewport: chromium.defaultViewport
+      headless: "new",
+      args: [
+        "--no-sandbox",
+        "--disable-setuid-sandbox",
+        "--disable-dev-shm-usage",
+        "--disable-gpu"
+      ]
     });
 
     const page = await browser.newPage();
-    await page.goto("https://www.tmdn.org/tmview/#/tmview", {
-      waitUntil: "networkidle2"
+
+    // URL base de TMView
+    const encoded = encodeURIComponent(brand);
+    const url = `https://www.tmdn.org/tmview/#/tmview/results?page=1&pageSize=30&criteria=C&offices=AR,WO&territories=AR&basicSearch=${encoded}`;
+
+    // Navegar a la página con la marca buscada
+    await page.goto(url, {
+      waitUntil: "networkidle2",
+      timeout: 60000
     });
 
-    await page.waitForSelector('input[placeholder="Nombre de la marca"]', { timeout: 8000 });
-    await page.type('input[placeholder="Nombre de la marca"]', brand);
+    // Esperar que TMView cargue resultados
+    await page.waitForSelector(".tm-table-row", { timeout: 20000 });
 
-    await page.click('button[type="submit"]');
-    await page.waitForSelector(".tm-card-content", { timeout: 12000 });
-
+    // Extraer datos desde el frontend de TMView
     const results = await page.evaluate(() => {
-      const items = [];
-      const cards = document.querySelectorAll(".tm-card-content");
+      const rows = document.querySelectorAll(".tm-table-row");
 
-      cards.forEach(card => {
-        const name = card.querySelector(".tm-title")?.innerText || null;
+      return Array.from(rows).map((row) => {
+        const name =
+          row.querySelector(".tm-trademark-name")?.innerText?.trim() || null;
 
-        const classes = card
-          .querySelector(".nice-classes")?.innerText.replace("Clases: ", "")
+        const classes = row
+          .querySelector(".tm-nice-code")
+          ?.innerText?.replace("Clases: ", "")
           .split(",")
-          .map(n => Number(n.trim()));
+          .map((c) => Number(c.trim())) || [];
 
-        items.push({
-          name,
-          classes
-        });
+        const status =
+          row.querySelector(".tm-status")?.innerText?.trim() || null;
+
+        const applicant =
+          row.querySelector(".tm-applicant-name")?.innerText?.trim() || null;
+
+        return { name, classes, status, applicant };
       });
-
-      return items;
     });
 
     await browser.close();
@@ -51,6 +59,10 @@ export async function scrapeTmview(brand) {
 
   } catch (err) {
     if (browser) await browser.close();
-    return { ok: false, error: err.message };
+
+    return {
+      ok: false,
+      error: err.message
+    };
   }
 }
