@@ -1,53 +1,61 @@
 import puppeteer from "puppeteer";
 
 export async function getTmviewResults(brand) {
+  const browser = await puppeteer.launch({
+    headless: "new",
+    args: [
+      "--no-sandbox",
+      "--disable-setuid-sandbox",
+      "--disable-gpu",
+      "--disable-dev-shm-usage"
+    ]
+  });
+
+  const page = await browser.newPage();
+
+  const url = "https://www.tmdn.org/tmview/#/tmview";
+
   try {
-    const browser = await puppeteer.launch({
-      headless: "new",
-      args: ["--no-sandbox", "--disable-setuid-sandbox"]
-    });
+    // Abrir página
+    await page.goto(url, { waitUntil: "networkidle0" });
 
-    const page = await browser.newPage();
-
-    // URL principal
-    const url = "https://www.tmdn.org/tmview/#/tmview";
-
-    // Ir a TMView
-    await page.goto(url, { waitUntil: "networkidle2" });
-
-    // Buscar input por placeholder
-    await page.type('input[placeholder="Nombre de marca"]', brand);
-    await page.waitForTimeout(1500);
+    // Completar input
+    await page.type('input[placeholder="Nombre de la marca"]', brand);
+    await page.waitForTimeout(1200);
 
     // Click en Buscar
     await page.click('button[type="submit"]');
-    await page.waitForNavigation({ waitUntil: "networkidle2" });
+    await page.waitForNavigation({ waitUntil: "networkidle0" });
 
-    // Esperar resultados
+    // Esperar cards
     await page.waitForSelector(".tm-card-content", { timeout: 8000 });
 
-    // Extraer contenido
-    const results = await page.evaluate(() => {
-      const items = [];
-      document.querySelectorAll(".tm-card-content").forEach(card => {
-        const name =
-          card.querySelector(".tm-title")?.innerText?.trim() || null;
+    const items = await page.evaluate(() => {
+      const results = [];
+      document.querySelectorAll(".tm-card-content").forEach((card) => {
+        const name = card.querySelector(".tm-title")?.innerText || null;
 
-        const classes =
+        const classesText =
           card
             .querySelector(".nice-classes")
-            ?.innerText.replace("Clases: ", "")
-            ?.split(",")
-            ?.map(n => Number(n.trim())) || [];
+            ?.innerText.replace("Clases: ", "") || "";
 
-        items.push({ name, classes });
+        const classes = classesText
+          .split(",")
+          .map((c) => Number(c.trim()))
+          .filter(Boolean);
+
+        results.push({ name, classes });
       });
-      return items;
+
+      return results;
     });
 
     await browser.close();
-    return results;
+    return items;
+
   } catch (err) {
+    await browser.close();
     return { ok: false, error: err.message };
   }
 }
