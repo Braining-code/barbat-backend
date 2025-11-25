@@ -1,9 +1,9 @@
 import puppeteer from "puppeteer";
 
-export async function getTmviewResults(brand) {
+export async function scrapeTmview(brand) {
   const browser = await puppeteer.launch({
     headless: "new",
-    executablePath: process.env.PUPPETEER_EXECUTABLE_PATH,   // ⬅️ ESTA ES LA LÍNEA CLAVE
+    executablePath: process.env.PUPPETEER_EXECUTABLE_PATH,
     args: [
       "--no-sandbox",
       "--disable-setuid-sandbox",
@@ -17,18 +17,14 @@ export async function getTmviewResults(brand) {
   const url = "https://www.tmdn.org/tmview/#/tmview";
 
   try {
-    // Abrir página
     await page.goto(url, { waitUntil: "networkidle0" });
 
-    // Completar input
     await page.type('input[placeholder="Nombre de la marca"]', brand);
     await page.waitForTimeout(1200);
 
-    // Click en Buscar
     await page.click('button[type="submit"]');
     await page.waitForNavigation({ waitUntil: "networkidle0" });
 
-    // Esperar cards
     await page.waitForSelector(".tm-card-content", { timeout: 8000 });
 
     const items = await page.evaluate(() => {
