@@ -19,11 +19,15 @@ export async function scrapeTmview(brand) {
       timeout: 45000
     });
 
+    // Campo búsqueda
     await page.waitForSelector('input[placeholder*="trade mark"]', { timeout: 15000 });
     await page.type('input[placeholder*="trade mark"]', brand);
 
-    await page.click('button[data-testid="search-button"]');
+    // BOTÓN NUEVO (2025 estable con aria-label)
+    await page.waitForSelector('button[aria-label="Search"]', { timeout: 15000 });
+    await page.click('button[aria-label="Search"]');
 
+    // Resultados
     await page.waitForSelector(".tm-card-content", { timeout: 20000 });
 
     const items = await page.evaluate(() =>
