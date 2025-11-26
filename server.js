@@ -7,8 +7,7 @@ import StealthPlugin from "puppeteer-extra-plugin-stealth";
 // activar Stealth mode
 puppeteer.use(StealthPlugin());
 
-import { scrapeTmview } from "./services/tmview.js";
-import { scrapeTMView as scrapeTMViewStealth } from "./services/tmviewStealth.js";
+import { scrapeTMView } from "./services/tmviewStealth.js";
 
 const app = express();
 
@@ -29,39 +28,7 @@ app.get("/buscar", (req, res) => {
   });
 });
 
-// 🟩 RUTA REAL DEL MVP (Scraping TMView normal)
-app.post("/api/search", async (req, res) => {
-  const { brand, classes } = req.body;
-
-  if (!brand) {
-    return res.status(400).json({
-      ok: false,
-      message: "Falta brand"
-    });
-  }
-
-  try {
-    const results = await scrapeTmview(brand);
-
-    return res.json({
-      ok: true,
-      brand,
-      classes,
-      sources: {
-        tmview: results
-      }
-    });
-
-  } catch (error) {
-    return res.status(500).json({
-      ok: false,
-      message: "Error al scrapear TMView",
-      details: error.message
-    });
-  }
-});
-
-// 🟩 NUEVA RUTA — SCRAPER STEALTH (Playwright stealth)
+// 🟩 NUEVA RUTA — SCRAPER STEALTH (Puppeteer + Stealth)
 app.post("/api/scrape", async (req, res) => {
   const { query } = req.body;
 
@@ -70,7 +37,7 @@ app.post("/api/scrape", async (req, res) => {
   }
 
   try {
-    const result = await scrapeTMViewStealth(query);
+    const result = await scrapeTMView(query);
     res.json(result);
   } catch (error) {
     res.status(500).json({
