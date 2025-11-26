@@ -1,14 +1,17 @@
-import puppeteer from "puppeteer";
+import puppeteer from "puppeteer-core";
 
 export async function scrapeTmview(brand) {
   const browser = await puppeteer.launch({
     headless: "new",
+    executablePath: "/usr/bin/google-chrome-stable",   // 🔥 ruta correcta en Render
     args: [
       "--no-sandbox",
       "--disable-setuid-sandbox",
-      "--disable-dev-shm-usage",
       "--disable-gpu",
+      "--disable-dev-shm-usage",
       "--disable-software-rasterizer",
+      "--no-first-run",
+      "--no-zygote"
     ]
   });
 
@@ -31,8 +34,11 @@ export async function scrapeTmview(brand) {
       const results = [];
       document.querySelectorAll(".tm-card-content").forEach((card) => {
         const name = card.querySelector(".tm-title")?.innerText || null;
+
         const classesText =
-          card.querySelector(".nice-classes")?.innerText.replace("Clases: ", "") || "";
+          card.querySelector(".nice-classes")?.innerText.replace("Clases:", "") ||
+          "";
+
         const classes = classesText
           .split(",")
           .map((c) => Number(c.trim()))
@@ -40,6 +46,7 @@ export async function scrapeTmview(brand) {
 
         results.push({ name, classes });
       });
+
       return results;
     });
 
