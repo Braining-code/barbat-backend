@@ -33,7 +33,7 @@ app.get("/buscar", (req, res) => {
   });
 });
 
-// 🟩 Scraper normal (ya no lo usamos pero puede quedar)
+// 🟩 Scraper normal (test)
 app.post("/api/search", async (req, res) => {
   const { brand, classes } = req.body;
 
@@ -45,11 +45,15 @@ app.post("/api/search", async (req, res) => {
     const results = await scrapeTmview(brand);
     res.json({ ok: true, brand, classes, sources: { tmview: results } });
   } catch (error) {
-    res.status(500).json({ ok: false, message: "Error al scrapear TMView", details: error.message });
+    res.status(500).json({
+      ok: false,
+      message: "Error al scrapear TMView",
+      details: error.message
+    });
   }
 });
 
-// 🟩 Scraper stealth real
+// 🟩 Scraper stealth real (Argentina)
 app.post("/api/scrape", async (req, res) => {
   const { query } = req.body;
 
@@ -78,4 +82,35 @@ app.get("/puppeteer-test", async (req, res) => {
         "--no-sandbox",
         "--disable-setuid-sandbox",
         "--disable-dev-shm-usage",
-        "--disable-g
+        "--disable-gpu",
+        "--disable-blink-features=AutomationControlled",
+        "--disable-infobars",
+        "--window-size=1280,800"
+      ]
+    });
+
+    const page = await browser.newPage();
+    await page.goto("https://example.com", { waitUntil: "networkidle0" });
+
+    const title = await page.title();
+    await browser.close();
+
+    res.json({
+      ok: true,
+      message: "Puppeteer EXTRA + Stealth funciona",
+      title
+    });
+
+  } catch (error) {
+    res.json({
+      ok: false,
+      error: error.message
+    });
+  }
+});
+
+// 🟦 Puerto dinámico
+const port = process.env.PORT || 3000;
+app.listen(port, () => {
+  console.log("Backend Barbat corriendo en puerto " + port);
+});
