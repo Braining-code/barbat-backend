@@ -2,15 +2,12 @@ import puppeteer from "puppeteer";
 
 export async function scrapeTmview(brand) {
   const browser = await puppeteer.launch({
-    headless: "new",
-    executablePath: "/usr/bin/google-chrome-stable",
+    headless: true,
     args: [
       "--no-sandbox",
       "--disable-setuid-sandbox",
-      "--disable-gpu",
       "--disable-dev-shm-usage",
-      "--no-first-run",
-      "--no-zygote"
+      "--disable-gpu"
     ]
   });
 
@@ -19,47 +16,34 @@ export async function scrapeTmview(brand) {
   try {
     await page.goto("https://www.tmdn.org/tmview/#/tmview", {
       waitUntil: "networkidle2",
-      timeout: 60000
+      timeout: 45000
     });
 
-    // 🟦 Nuevo selector 2025
-    await page.waitForSelector('input[placeholder*="trade mark"]', {
-      timeout: 15000
-    });
+    await page.waitForSelector('input[placeholder*="trade mark"]', { timeout: 15000 });
+    await page.type('input[placeholder*="trade mark"]', brand);
 
-    // 🟦 Completar marca
-    await page.type('input[placeholder*="trade mark"]', brand, { delay: 80 });
-
-    // 🟦 Botón buscar
     await page.click('button[data-testid="search-button"]');
 
-    // 🟦 Esperar resultados
-    await page.waitForSelector(".tm-card-content", {
-      timeout: 15000
-    });
+    await page.waitForSelector(".tm-card-content", { timeout: 20000 });
 
-    const results = await page.evaluate(() => {
-      return [...document.querySelectorAll(".tm-card-content")].map(card => {
-        const name = card.querySelector(".tm-title")?.innerText || null;
-        const classesText =
-          card.querySelector(".nice-classes")?.innerText
-            ?.replace("Classes:", "")
-            ?.trim() || "";
-
-        const classes = classesText
+    const items = await page.evaluate(() =>
+      [...document.querySelectorAll(".tm-card-content")].map(card => ({
+        name: card.querySelector(".tm-title")?.innerText?.trim() || null,
+        classes: (card.querySelector(".nice-classes")?.innerText || "")
+          .replace("Classes:", "")
+          .replace("Clases:", "")
           .split(",")
           .map(n => parseInt(n.trim()))
-          .filter(Boolean);
-
-        return { name, classes };
-      });
-    });
+          .filter(Boolean)
+      }))
+    );
 
     await browser.close();
-    return results;
+    return items;
 
   } catch (err) {
     await browser.close();
     return { ok: false, error: err.message };
   }
 }
+
