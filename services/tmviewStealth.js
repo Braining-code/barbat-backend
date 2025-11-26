@@ -4,6 +4,15 @@ import StealthPlugin from "puppeteer-extra-plugin-stealth";
 puppeteer.use(StealthPlugin());
 
 export async function scrapeTMView(query) {
+
+  const search = encodeURIComponent(query.trim());
+
+  const url = `https://www.tmdn.org/tmview/#/tmview/results` +
+              `?page=1&pageSize=30` +
+              `&criteria=C` +
+              `&territories=AR` +
+              `&basicSearch=${search}`;
+
   const browser = await puppeteer.launch({
     headless: true,
     args: [
@@ -23,38 +32,47 @@ export async function scrapeTMView(query) {
   );
 
   try {
-    await page.goto("https://www.tmdn.org/tmview/#/tmview", {
+    await page.goto(url, {
       waitUntil: "networkidle2",
-      timeout: 45000
+      timeout: 60000
     });
 
-    await page.waitForSelector("input[placeholder='Search']", { timeout: 20000 });
-    await page.type("input[placeholder='Search']", query);
-    await page.keyboard.press("Enter");
-
-    await page.waitForSelector(".result-list", { timeout: 35000 });
-    await page.waitForTimeout(1500);
-
-    const data = await page.evaluate(() => {
-      const row = document.querySelector(".result-item");
-      if (!row) return null;
-
-      return {
-        trademark: row.querySelector(".markName")?.innerText || null,
-        number: row.querySelector(".appNumber")?.innerText || null,
-        status: row.querySelector(".status")?.innerText || null,
-        holder: row.querySelector(".holder")?.innerText || null,
-        classes: row.querySelector(".niceClass")?.innerText || null,
-        country: row.querySelector(".country")?.innerText || null
-      };
+    // Esperar a que aparezcan resultados
+    await page.waitForSelector(".tm-card-content, .no-results", {
+      timeout: 30000
     });
 
-    return { ok: true, query, data };
+    const items = await page.evaluate(() => {
+      const results = [];
+
+      const cards = document.querySelectorAll(".tm-card-content");
+      if (!cards.length) return results;
+
+      cards.forEach(card => {
+        results.push({
+          name: card.querySelector(".tm-title")?.innerText || null,
+          status: card.querySelector(".tm-status")?.innerText || null,
+          classes: card.querySelector(".nice-classes")?.innerText || null,
+          holder: card.querySelector(".tm-applicant")?.innerText || null,
+          number: card.querySelector(".tm-number")?.innerText || null,
+        });
+      });
+
+      return results;
+    });
+
+    await browser.close();
+
+    return {
+      ok: true,
+      query,
+      count: items.length,
+      results: items
+    };
 
   } catch (err) {
-    console.error("TMView scraping error:", err);
-    return { ok: false, error: err.message };
-  } finally {
+    console.error("Error TMView:", err);
     await browser.close();
+    return { ok: false, error: err.message };
   }
 }
