@@ -1,28 +1,35 @@
 import express from "express";
 import cors from "cors";
-import puppeteer from "puppeteer";  // ⬅️ necesario para /puppeteer-test
+
+import puppeteer from "puppeteer-extra";
+import StealthPlugin from "puppeteer-extra-plugin-stealth";
+
+// activar Stealth mode
+puppeteer.use(StealthPlugin());
+
 import { scrapeTmview } from "./services/tmview.js";
+import { scrapeTMView as scrapeTMViewStealth } from "./services/tmviewStealth.js";
 
 const app = express();
 
 app.use(cors());
 app.use(express.json());
 
-// 🔵 Ruta base
+// 🟦 Ruta base
 app.get("/", (req, res) => {
   res.json({ message: "Barbat backend online" });
 });
 
-// 🔵 Ruta mock (puede quedar)
+// 🟦 Ruta mock
 app.get("/buscar", (req, res) => {
   res.json({
     status: "ok",
     marca: req.query.marca || null,
-    mensaje: "Esto es solo un mock para probar Render"
+    mensaje: "Mock funcionando"
   });
 });
 
-// 🔥 RUTA REAL DEL MVP (scraping TMView)
+// 🟩 RUTA REAL DEL MVP (Scraping TMView normal)
 app.post("/api/search", async (req, res) => {
   const { brand, classes } = req.body;
 
@@ -34,7 +41,6 @@ app.post("/api/search", async (req, res) => {
   }
 
   try {
-    // 👉 Scrapear TMView con Puppeteer
     const results = await scrapeTmview(brand);
 
     return res.json({
@@ -43,34 +49,49 @@ app.post("/api/search", async (req, res) => {
       classes,
       sources: {
         tmview: results
-      },
-      meta: {
-        provider: "TMView (scraper)",
-        count: Array.isArray(results) ? results.length : 0,
-        nextStep: "Agregar similitud / WIPO"
       }
     });
 
   } catch (error) {
     return res.status(500).json({
       ok: false,
-      message: "Error interno al scrapear TMView",
+      message: "Error al scrapear TMView",
       details: error.message
     });
   }
 });
 
-// ⭐ RUTA PARA PROBAR CHROME + PUPPETEER
+// 🟩 NUEVA RUTA — SCRAPER STEALTH (Playwright stealth)
+app.post("/api/scrape", async (req, res) => {
+  const { query } = req.body;
+
+  if (!query) {
+    return res.status(400).json({ ok: false, error: "Missing query" });
+  }
+
+  try {
+    const result = await scrapeTMViewStealth(query);
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({
+      ok: false,
+      message: "Error interno al scrapear (Stealth)",
+      details: error.message
+    });
+  }
+});
+
+// ⭐ RUTA TEST CHROME
 app.get("/puppeteer-test", async (req, res) => {
   try {
     const browser = await puppeteer.launch({
-      headless: "new",
-      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH,
+      headless: true,
       args: [
         "--no-sandbox",
         "--disable-setuid-sandbox",
         "--disable-dev-shm-usage",
-        "--disable-gpu"
+        "--disable-gpu",
+        "--disable-blink-features=AutomationControlled"
       ]
     });
 
@@ -83,7 +104,7 @@ app.get("/puppeteer-test", async (req, res) => {
 
     res.json({
       ok: true,
-      message: "Chrome se ejecutó correctamente con Puppeteer.",
+      message: "Puppeteer EXTRA + Stealth funciona",
       title
     });
 
@@ -95,7 +116,7 @@ app.get("/puppeteer-test", async (req, res) => {
   }
 });
 
-// 🔵 Puerto dinámico (OBLIGATORIO en Render)
+// 🟦 Puerto dinámico
 const port = process.env.PORT || 3000;
 
 app.listen(port, () => {
