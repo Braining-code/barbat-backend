@@ -3,12 +3,7 @@ import puppeteer from "puppeteer";
 export async function scrapeTmview(brand) {
   const browser = await puppeteer.launch({
     headless: true,
-    args: [
-      "--no-sandbox",
-      "--disable-setuid-sandbox",
-      "--disable-dev-shm-usage",
-      "--disable-gpu"
-    ]
+    args: ["--no-sandbox", "--disable-setuid-sandbox"]
   });
 
   const page = await browser.newPage();
@@ -16,26 +11,46 @@ export async function scrapeTmview(brand) {
   try {
     await page.goto("https://www.tmdn.org/tmview/#/tmview", {
       waitUntil: "networkidle2",
-      timeout: 45000
+      timeout: 60000
     });
 
-    // Campo búsqueda
-    await page.waitForSelector('input[placeholder*="trade mark"]', { timeout: 15000 });
-    await page.type('input[placeholder*="trade mark"]', brand);
+    // Esperar el formulario completo
+    await page.waitForSelector(".tmview-search-form", { timeout: 20000 });
 
-    // BOTÓN NUEVO (2025 estable con aria-label)
-    await page.waitForSelector('button[aria-label="Search"]', { timeout: 15000 });
-    await page.click('button[aria-label="Search"]');
+    // Campo de búsqueda
+    const searchInput = 'input[placeholder*="trade mark"]';
+    await page.waitForSelector(searchInput, { timeout: 20000 });
+    await page.type(searchInput, brand);
 
-    // Resultados
-    await page.waitForSelector(".tm-card-content", { timeout: 20000 });
+    // Detectar el botón de búsqueda por varios selectores
+    const selectors = [
+      'button[aria-label="Search"]',
+      'button.p-button-icon-only',
+      'button[type="button"]',
+      '.p-button.p-component'
+    ];
+
+    let found = false;
+
+    for (const sel of selectors) {
+      const exists = await page.$(sel);
+      if (exists) {
+        await exists.click();
+        found = true;
+        break;
+      }
+    }
+
+    if (!found) throw new Error("No se encontró ningún botón de búsqueda.");
+
+    // Esperar resultados
+    await page.waitForSelector(".tm-card-content", { timeout: 30000 });
 
     const items = await page.evaluate(() =>
       [...document.querySelectorAll(".tm-card-content")].map(card => ({
-        name: card.querySelector(".tm-title")?.innerText?.trim() || null,
+        name: card.querySelector(".tm-title")?.innerText || null,
         classes: (card.querySelector(".nice-classes")?.innerText || "")
-          .replace("Classes:", "")
-          .replace("Clases:", "")
+          .replace(/Classes:|Clases:/, "")
           .split(",")
           .map(n => parseInt(n.trim()))
           .filter(Boolean)
@@ -50,4 +65,3 @@ export async function scrapeTmview(brand) {
     return { ok: false, error: err.message };
   }
 }
-
