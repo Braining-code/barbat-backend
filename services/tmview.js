@@ -1,7 +1,7 @@
 import puppeteer from "puppeteer";
 
 export async function scrapeTmview(brand) {
-
+  // Lanzar Chromium embebido (rápido + compatible Railway)
   const browser = await puppeteer.launch({
     headless: true,
     args: [
@@ -17,31 +17,40 @@ export async function scrapeTmview(brand) {
   });
 
   const page = await browser.newPage();
-
   const url = "https://www.tmdn.org/tmview/#/tmview";
 
   try {
-    await page.goto(url, { waitUntil: "networkidle2" });
+    // Cargar TMView (SPA pesada)
+    await page.goto(url, { waitUntil: "networkidle2", timeout: 35000 });
 
-    await page.waitForSelector('input[placeholder="Nombre de la marca"]', {
-      timeout: 10000,
+    // Esperar input correcto (ya no existe "Nombre de la marca")
+    await page.waitForSelector('input[name="basicSearchText"]', {
+      timeout: 15000
     });
 
-    await page.type('input[placeholder="Nombre de la marca"]', brand);
-    await page.waitForTimeout(1000);
+    // Escribir la marca
+    await page.type('input[name="basicSearchText"]', brand);
 
-    await page.click('button[type="submit"]');
+    // Ejecutar búsqueda — ENTER es más estable que el botón
+    await page.keyboard.press("Enter");
 
-    await page.waitForSelector(".tm-card-content", { timeout: 15000 });
+    // Esperar resultados (tarjetas)
+    await page.waitForSelector(".tm-card-content", {
+      timeout: 20000
+    });
 
+    // Extraer datos
     const items = await page.evaluate(() => {
       const results = [];
+
       document.querySelectorAll(".tm-card-content").forEach((card) => {
-        const name = card.querySelector(".tm-title")?.innerText || null;
+        const name =
+          card.querySelector(".tm-title")?.innerText?.trim() || null;
 
         const classesText =
-          card.querySelector(".nice-classes")?.innerText.replace("Clases:", "") ||
-          "";
+          card.querySelector(".nice-classes")?.innerText
+            ?.replace("Classes:", "")
+            ?.replace("Clases:", "") || "";
 
         const classes = classesText
           .split(",")
@@ -55,10 +64,19 @@ export async function scrapeTmview(brand) {
     });
 
     await browser.close();
-    return items;
+
+    return {
+      ok: true,
+      brand,
+      count: items.length,
+      items
+    };
 
   } catch (err) {
     await browser.close();
-    return { ok: false, error: err.message };
+    return {
+      ok: false,
+      error: err.message
+    };
   }
 }
