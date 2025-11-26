@@ -1,9 +1,9 @@
-import puppeteer from "puppeteer-core";
+import puppeteer from "puppeteer";
 
 export async function scrapeTmview(brand) {
+
   const browser = await puppeteer.launch({
-    headless: "new",
-    executablePath: "/usr/bin/google-chrome-stable",   // 🔥 ruta correcta en Render
+    headless: true,
     args: [
       "--no-sandbox",
       "--disable-setuid-sandbox",
@@ -11,7 +11,8 @@ export async function scrapeTmview(brand) {
       "--disable-dev-shm-usage",
       "--disable-software-rasterizer",
       "--no-first-run",
-      "--no-zygote"
+      "--no-zygote",
+      "--single-process"
     ]
   });
 
@@ -20,15 +21,18 @@ export async function scrapeTmview(brand) {
   const url = "https://www.tmdn.org/tmview/#/tmview";
 
   try {
-    await page.goto(url, { waitUntil: "networkidle0" });
+    await page.goto(url, { waitUntil: "networkidle2" });
+
+    await page.waitForSelector('input[placeholder="Nombre de la marca"]', {
+      timeout: 10000,
+    });
 
     await page.type('input[placeholder="Nombre de la marca"]', brand);
-    await page.waitForTimeout(1200);
+    await page.waitForTimeout(1000);
 
     await page.click('button[type="submit"]');
-    await page.waitForNavigation({ waitUntil: "networkidle0" });
 
-    await page.waitForSelector(".tm-card-content", { timeout: 8000 });
+    await page.waitForSelector(".tm-card-content", { timeout: 15000 });
 
     const items = await page.evaluate(() => {
       const results = [];
