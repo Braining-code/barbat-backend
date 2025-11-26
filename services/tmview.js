@@ -1,82 +1,65 @@
 import puppeteer from "puppeteer";
 
 export async function scrapeTmview(brand) {
-  // Lanzar Chromium embebido (rápido + compatible Railway)
   const browser = await puppeteer.launch({
-    headless: true,
+    headless: "new",
+    executablePath: "/usr/bin/google-chrome-stable",
     args: [
       "--no-sandbox",
       "--disable-setuid-sandbox",
       "--disable-gpu",
       "--disable-dev-shm-usage",
-      "--disable-software-rasterizer",
       "--no-first-run",
-      "--no-zygote",
-      "--single-process"
+      "--no-zygote"
     ]
   });
 
   const page = await browser.newPage();
-  const url = "https://www.tmdn.org/tmview/#/tmview";
 
   try {
-    // Cargar TMView (SPA pesada)
-    await page.goto(url, { waitUntil: "networkidle2", timeout: 35000 });
+    await page.goto("https://www.tmdn.org/tmview/#/tmview", {
+      waitUntil: "networkidle2",
+      timeout: 60000
+    });
 
-    // Esperar input correcto (ya no existe "Nombre de la marca")
-    await page.waitForSelector('input[name="basicSearchText"]', {
+    // 🟦 Nuevo selector 2025
+    await page.waitForSelector('input[placeholder*="trade mark"]', {
       timeout: 15000
     });
 
-    // Escribir la marca
-    await page.type('input[name="basicSearchText"]', brand);
+    // 🟦 Completar marca
+    await page.type('input[placeholder*="trade mark"]', brand, { delay: 80 });
 
-    // Ejecutar búsqueda — ENTER es más estable que el botón
-    await page.keyboard.press("Enter");
+    // 🟦 Botón buscar
+    await page.click('button[data-testid="search-button"]');
 
-    // Esperar resultados (tarjetas)
+    // 🟦 Esperar resultados
     await page.waitForSelector(".tm-card-content", {
-      timeout: 20000
+      timeout: 15000
     });
 
-    // Extraer datos
-    const items = await page.evaluate(() => {
-      const results = [];
-
-      document.querySelectorAll(".tm-card-content").forEach((card) => {
-        const name =
-          card.querySelector(".tm-title")?.innerText?.trim() || null;
-
+    const results = await page.evaluate(() => {
+      return [...document.querySelectorAll(".tm-card-content")].map(card => {
+        const name = card.querySelector(".tm-title")?.innerText || null;
         const classesText =
           card.querySelector(".nice-classes")?.innerText
             ?.replace("Classes:", "")
-            ?.replace("Clases:", "") || "";
+            ?.trim() || "";
 
         const classes = classesText
           .split(",")
-          .map((c) => Number(c.trim()))
+          .map(n => parseInt(n.trim()))
           .filter(Boolean);
 
-        results.push({ name, classes });
+        return { name, classes };
       });
-
-      return results;
     });
 
     await browser.close();
-
-    return {
-      ok: true,
-      brand,
-      count: items.length,
-      items
-    };
+    return results;
 
   } catch (err) {
     await browser.close();
-    return {
-      ok: false,
-      error: err.message
-    };
+    return { ok: false, error: err.message };
   }
 }
