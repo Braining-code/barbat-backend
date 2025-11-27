@@ -4,21 +4,19 @@ import StealthPlugin from "puppeteer-extra-plugin-stealth";
 puppeteer.use(StealthPlugin());
 
 export async function scrapeTMView(query) {
-  const search = encodeURIComponent(query.trim());
+  const encoded = encodeURIComponent(query.trim());
 
-  const url = `https://www.tmdn.org/tmview/#/tmview/results?page=1&pageSize=30&criteria=C&territories=AR&basicSearch=${search}`;
+  const url = `https://www.tmdn.org/tmview/#/tmview/results?page=1&pageSize=30&criteria=C&territories=AR&basicSearch=${encoded}`;
 
   const browser = await puppeteer.launch({
     headless: true,
-    executablePath: process.env.PUPPETEER_EXECUTABLE_PATH,   // 🔥 OBLIGATORIO
     args: [
       "--no-sandbox",
       "--disable-setuid-sandbox",
       "--disable-dev-shm-usage",
       "--disable-gpu",
       "--disable-blink-features=AutomationControlled",
-      "--disable-infobars",
-      "--window-size=1300,800"
+      "--window-size=1366,768"
     ]
   });
 
@@ -31,26 +29,34 @@ export async function scrapeTMView(query) {
   try {
     await page.goto(url, { waitUntil: "networkidle2", timeout: 60000 });
 
-    await page.waitForSelector(".result-list, .no-results", { timeout: 50000 });
+    // 🔥 NUEVO selector correcto
+    await page.waitForSelector("div.results-container, div.no-results", {
+      timeout: 60000
+    });
 
     const results = await page.evaluate(() => {
-      const rows = document.querySelectorAll(".result-item");
-      return [...rows].map(row => ({
-        name: row.querySelector(".markName")?.innerText || null,
-        number: row.querySelector(".appNumber")?.innerText || null,
-        status: row.querySelector(".status")?.innerText || null,
-        holder: row.querySelector(".holder")?.innerText || null,
-        classes: row.querySelector(".niceClass")?.innerText || null,
-        country: row.querySelector(".country")?.innerText || "AR"
-      }));
+      const items = [];
+
+      const cards = document.querySelectorAll("div.result-card");
+
+      cards.forEach(card => {
+        items.push({
+          name: card.querySelector(".result-title")?.innerText || null,
+          number: card.querySelector(".result-number")?.innerText || null,
+          status: card.querySelector(".result-status")?.innerText || null,
+          classes: card.querySelector(".result-classes")?.innerText || null,
+          holder: card.querySelector(".result-applicant")?.innerText || null,
+          country: card.querySelector(".result-country")?.innerText || "AR"
+        });
+      });
+
+      return items;
     });
 
     return { ok: true, query, results };
 
-  } catch (error) {
-    console.error("TMView scraping error:", error);
-    return { ok: false, error: error.message };
-
+  } catch (err) {
+    return { ok: false, error: err.message };
   } finally {
     await browser.close();
   }
